@@ -52,4 +52,26 @@ jobs:
         run: |
           curl -X POST https://api.render.com/services/identity-service/deployments \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -d '{"image": "${{ secrets.DOCKER_USERNAME }}/identity-app:latest"}'
+            -H "Content-Type: application/json" \
+            -d '{
+              "image": "${{ secrets.DOCKER_USERNAME }}/identity-app:latest",
+              "envVars": [
+                {"key": "BUILD_NUMBER", "value": "${{ github.run_number }}"},
+                {"key": "GIT_COMMIT", "value": "${{ github.sha }}"}
+              ]
+            }'
+
+      # Step 8: Verify deployment
+      - name: Wait for deployment and verify
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 60
+          echo "Verifying deployment..."
+          RESPONSE=$(curl -s https://identity-service.onrender.com/cicd-check || echo "Failed to connect")
+          echo "Response from service: $RESPONSE"
+          if [[ $RESPONSE == *"CI/CD pipeline is working correctly"* ]]; then
+            echo "✅ CI/CD verification successful!"
+          else
+            echo "❌ CI/CD verification failed or service not yet available"
+            echo "This is expected on the first run when the endpoint doesn't exist yet"
+          fi

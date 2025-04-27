@@ -15,15 +15,26 @@ let products = [
 // Route chính
 app.get('/', (req, res) => {
   res.json({
-    message: 'Product Service API',
+    message: 'Product Service API - CI/CD Demo Successful!',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.1.0'
   });
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// CI/CD verification endpoint
+app.get('/cicd-check', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'CI/CD pipeline is working correctly!',
+    deployTime: new Date().toISOString(),
+    buildNumber: process.env.BUILD_NUMBER || 'latest'
+  });
 });
 
 // API lấy tất cả sản phẩm
