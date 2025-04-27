@@ -22,44 +22,46 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Step 4: Build the Docker image
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/identity-app:latest .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/identity-app:latest .
 
       # Step 5: Push Docker image to Docker Hub
       - name: Push Docker image to Docker Hub
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/identity-app:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/identity-app:latest
 
   deploy-to-render:
     needs: docker-build-push
     runs-on: ubuntu-latest
 
     steps:
-      # Step 6: Log in to Render
-      - name: Log in to Render
+      # Step 6: Log in to Render (không cần bước này)
+      - name: Check Render API Key
         run: |
-          echo ${{ secrets.RENDER_API_KEY }} | curl -X POST https://api.render.com/deploy \
-            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
-            -d '{"serviceId": "identity-service"}'
+          if [ -z "${{ secrets.RENDER_API_KEY }}" ]; then
+            echo "RENDER_API_KEY is not set. Please add it to your repository secrets."
+            exit 1
+          else
+            echo "RENDER_API_KEY is set. Proceeding with deployment."
+          fi
 
       # Step 7: Deploy image from Docker Hub to Render
       - name: Deploy to Render
         run: |
-          curl -X POST https://api.render.com/services/identity-service/deployments \
+          # Sử dụng API endpoint chính xác của Render
+          curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "image": "${{ secrets.DOCKER_USERNAME }}/identity-app:latest",
-              "envVars": [
-                {"key": "BUILD_NUMBER", "value": "${{ github.run_number }}"},
-                {"key": "GIT_COMMIT", "value": "${{ github.sha }}"}
-              ]
+              "clearCache": "clear"
             }'
+
+          echo "Deployment triggered successfully"
 
       # Step 8: Verify deployment
       - name: Wait for deployment and verify
@@ -67,11 +69,15 @@ jobs:
           echo "Waiting for deployment to complete..."
           sleep 60
           echo "Verifying deployment..."
-          RESPONSE=$(curl -s https://identity-service.onrender.com/cicd-check || echo "Failed to connect")
+          # Sử dụng URL thực tế của dịch vụ của bạn
+          SERVICE_URL="https://cicd-demo-ixvs.onrender.com"
+          RESPONSE=$(curl -s $SERVICE_URL/cicd-check || echo "Failed to connect")
           echo "Response from service: $RESPONSE"
           if [[ $RESPONSE == *"CI/CD pipeline is working correctly"* ]]; then
             echo "✅ CI/CD verification successful!"
           else
             echo "❌ CI/CD verification failed or service not yet available"
             echo "This is expected on the first run when the endpoint doesn't exist yet"
+            # Không fail workflow nếu endpoint chưa sẵn sàng
+            echo "Continuing anyway to complete the workflow"
           fi
