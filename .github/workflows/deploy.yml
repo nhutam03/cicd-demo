@@ -8,6 +8,7 @@ on:
 jobs:
   docker-build-push:
     runs-on: ubuntu-latest
+    environment: demo
 
     steps:
       # Step 1: Checkout the code
@@ -39,6 +40,7 @@ jobs:
   deploy-to-render:
     needs: docker-build-push
     runs-on: ubuntu-latest
+    environment: demo
 
     steps:
       # Step 6: Deploy to Render using API
