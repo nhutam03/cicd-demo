@@ -47,7 +47,8 @@ jobs:
       - name: Deploy to Render
         run: |
           echo "Deploying to Render..."
-          curl -X POST "https://api.render.com/v1/services?limit=20" \
+          # First, get the list of services to find the service ID
+          curl -X GET "https://api.render.com/v1/services" \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             -H "Accept: application/json" \
             -o services.json
@@ -55,15 +56,22 @@ jobs:
           echo "Checking for service ID..."
           cat services.json
 
-          # Attempt direct deploy without service ID
+          # Extract service ID from the response (assuming you have a service with a specific name)
+          # This is a simple grep approach - you might need to use jq for more robust parsing
+          SERVICE_ID=$(cat services.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+          if [ -z "$SERVICE_ID" ]; then
+            echo "Could not find service ID in the response"
+            exit 1
+          fi
+
+          echo "Found service ID: $SERVICE_ID"
+
+          # Trigger a deploy using the correct service ID
           echo "Triggering deployment..."
-          RESPONSE=$(curl -X POST "https://api.render.com/v1/deploys" \
+          RESPONSE=$(curl -X POST "https://api.render.com/v1/services/$SERVICE_ID/deploys" \
             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "type": "docker_image",
-              "imageURL": "${{ secrets.DOCKER_USERNAME }}/identity-app:latest",
-              "serviceId": "identity-service"
-            }')
+            -d "{\"clearCache\": \"do_not_clear\"}")
 
           echo "Deployment response: $RESPONSE"
